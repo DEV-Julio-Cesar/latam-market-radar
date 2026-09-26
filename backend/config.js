@@ -4,7 +4,7 @@ export function configFromEnv(env = process.env) {
   return {
     host: env.HOST || '127.0.0.1', port: Number(env.PORT || 3001),
     databasePath: path.resolve(env.DATABASE_PATH || './data/radar.sqlite'),
-    origin: env.APP_ORIGIN || 'http://127.0.0.1:3001',
+    origin: env.APP_ORIGIN || env.RENDER_EXTERNAL_URL || 'http://127.0.0.1:3001',
     cookieSecure: env.COOKIE_SECURE === 'true', sessionHours: Number(env.SESSION_HOURS || 24),
     notificationsEnabled: env.NOTIFICATIONS_ENABLED === 'true',
     notificationOwner: (env.NOTIFICATION_OWNER_EMAIL || '').trim().toLowerCase(),
