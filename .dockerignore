@@ -1,0 +1,16 @@
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!backend/
+!backend/**
+!frontend/
+!frontend/**
+frontend/node_modules
+frontend/dist
+backend/tests
+**/.env
+**/.env.*
+**/*.sqlite*
+**/*.db
+**/*.log
