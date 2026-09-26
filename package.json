@@ -1,7 +1,14 @@
 {
-  "name": "latam-market-radar", "version": "1.0.0", "private": true, "type": "module",
-  "engines": {"node": ">=24.0.0"},
-  "workspaces": ["frontend"],
+  "name": "latam-market-radar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
     "dev": "node --env-file-if-exists=.env --watch backend/server.js",
     "dev:ui": "npm run dev --workspace frontend",
@@ -9,5 +16,11 @@
     "start": "node --env-file-if-exists=.env backend/server.js",
     "seed": "node --env-file-if-exists=.env backend/seed.js",
     "test": "node --test backend/tests/*.test.js"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "pg-mem": "^3.0.14"
   }
 }

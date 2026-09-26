@@ -1,30 +1,81 @@
 export function validDiscordWebhook(value) {
-  if(typeof value!=='string'||value.length>512)return false;
-  try {const u=new URL(value);return u.protocol==='https:'&&u.hostname==='discord.com'&&!u.port&&!u.username&&!u.password&&!u.search&&!u.hash&&/^\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/.test(u.pathname);}catch{return false;}
+  if (typeof value !== 'string' || value.length > 512) return false;
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' && u.hostname === 'discord.com' && !u.port && !u.username && !u.password && !u.search && !u.hash && /^\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/.test(u.pathname);
+  } catch {
+    return false;
+  }
 }
 // These are the only outbound HTTP adapters. Nothing contacts GNJOY or the game.
 export class DiscordAdapter {
   channel = 'discord';
-  constructor(config, transport = fetch) { this.config = config; this.transport = transport; }
-  configured() { return Boolean(this.config.discordWebhook); }
+  constructor(config, transport = fetch) {
+    this.config = config;
+    this.transport = transport;
+  }
+  configured() {
+    return Boolean(this.config.discordWebhook);
+  }
   async send(message) {
     const url = new URL(this.config.discordWebhook);
     if (!validDiscordWebhook(this.config.discordWebhook)) throw new Error('Webhook Discord inválido.');
-    const response = await this.transport(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:message,allowed_mentions:{parse:[]}}),signal:AbortSignal.timeout(10000),redirect:'error'});
+    const response = await this.transport(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        content: message,
+        allowed_mentions: {
+          parse: []
+        }
+      }),
+      signal: AbortSignal.timeout(10000),
+      redirect: 'error'
+    });
     if (!response.ok) throw new Error(`Discord respondeu HTTP ${response.status}.`);
   }
 }
 export class WhatsAppAdapter {
   channel = 'whatsapp';
-  constructor(config, transport = fetch) { this.config = config; this.transport = transport; }
-  configured() { const c=this.config; return Boolean(c.whatsappToken && c.whatsappPhone && c.whatsappRecipient && c.whatsappTemplate); }
+  constructor(config, transport = fetch) {
+    this.config = config;
+    this.transport = transport;
+  }
+  configured() {
+    const c = this.config;
+    return Boolean(c.whatsappToken && c.whatsappPhone && c.whatsappRecipient && c.whatsappTemplate);
+  }
   async send(message) {
-    const c=this.config;
+    const c = this.config;
     if (!/^v\d+\.\d+$/.test(c.whatsappVersion) || !/^\d+$/.test(c.whatsappPhone) || !/^\d+$/.test(c.whatsappRecipient)) throw new Error('Configuração WhatsApp inválida.');
     const response = await this.transport(`https://graph.facebook.com/${c.whatsappVersion}/${c.whatsappPhone}/messages`, {
-      method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${c.whatsappToken}`},
-      body:JSON.stringify({messaging_product:'whatsapp',to:c.whatsappRecipient,type:'template',template:{name:c.whatsappTemplate,language:{code:c.whatsappLanguage},components:[{type:'body',parameters:[{type:'text',text:message}]}]}}),
-      signal:AbortSignal.timeout(10000),redirect:'error',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${c.whatsappToken}`
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: c.whatsappRecipient,
+        type: 'template',
+        template: {
+          name: c.whatsappTemplate,
+          language: {
+            code: c.whatsappLanguage
+          },
+          components: [{
+            type: 'body',
+            parameters: [{
+              type: 'text',
+              text: message
+            }]
+          }]
+        }
+      }),
+      signal: AbortSignal.timeout(10000),
+      redirect: 'error'
     });
     if (!response.ok) throw new Error(`WhatsApp respondeu HTTP ${response.status}.`);
   }
@@ -33,44 +84,58 @@ export function alertMessage(a) {
   return `Latam Market Radar | ${a.alert_type === 'compra' ? 'Compra' : 'Venda'}: ${a.name} • ${a.server} • ${a.price.toLocaleString('pt-BR')} z • alvo ${a.target_price.toLocaleString('pt-BR')} z. Preço observado; confirme a disponibilidade.`;
 }
 export class NotificationService {
-  constructor(repository,config,adapters) {
-    this.repository=repository; this.config=config;
-    this.adapters=adapters || [new DiscordAdapter(config),new WhatsAppAdapter(config)];
-    this.running=false;
+  constructor(repository, config, adapters) {
+    this.repository = repository;
+    this.config = config;
+    this.adapters = adapters || [new DiscordAdapter(config), new WhatsAppAdapter(config)];
+    this.running = false;
   }
-  adapterFor(channel,user) {
-    if(!user)return null;
-    if(channel==='discord') {
-      const personal=this.repository.discord(user.id);
-      if(personal)return personal.enabled&&personal.webhook?new DiscordAdapter({discordWebhook:personal.webhook},this.discordTransport||fetch):null;
+  async adapterFor(channel, user) {
+    if (!user) return null;
+    if (channel === 'discord') {
+      const personal = await this.repository.discord(user.id);
+      if (personal) return personal.enabled && personal.webhook ? new DiscordAdapter({
+        discordWebhook: personal.webhook
+      }, this.discordTransport || fetch) : null;
     }
-    const adapter=this.adapters.find(a=>a.channel===channel);
-    return this.config.notificationsEnabled&&this.config.notificationOwner===user.email&&adapter?.configured()?adapter:null;
+    const adapter = this.adapters.find(a => a.channel === channel);
+    return this.config.notificationsEnabled && this.config.notificationOwner === user.email && adapter?.configured() ? adapter : null;
   }
-  discordStatus(user) {
-    const personal=this.repository.discord(user.id);
-    return {configured:Boolean(personal?.webhook),enabled:Boolean(this.adapterFor('discord',user)),source:personal?'personal':'server'};
+  async discordStatus(user) {
+    const personal = await this.repository.discord(user.id);
+    return {
+      configured: Boolean(personal?.webhook),
+      enabled: Boolean(await this.adapterFor('discord', user)),
+      source: personal ? 'personal' : 'server'
+    };
   }
-  enqueue(alert,user) {
+  async enqueue(alert, user) {
     for (const adapter of this.adapters) {
-      const enabled=Boolean(this.adapterFor(adapter.channel,user));
-      this.repository.createDelivery(alert.id,adapter.channel,enabled ? 'pending':'disabled',enabled ? '' : 'Canal desativado, não configurado ou conta sem destino.');
+      const enabled = Boolean(await this.adapterFor(adapter.channel, user));
+      await this.repository.createDelivery(alert.id, adapter.channel, enabled ? 'pending' : 'disabled', enabled ? '' : 'Canal desativado, não configurado ou conta sem destino.');
     }
   }
   async drain() {
     if (this.running) return;
-    this.running=true;
+    this.running = true;
     try {
-      for (const delivery of this.repository.pendingDeliveries()) {
-        const owner=this.repository.userById(delivery.user_id);
-        const adapter=this.adapterFor(delivery.channel,owner);
+      for (const delivery of await this.repository.pendingDeliveries()) {
+        const owner = await this.repository.userById(delivery.user_id);
+        const adapter = await this.adapterFor(delivery.channel, owner);
         if (!adapter) {
-          this.repository.setDelivery(delivery.delivery_id,'disabled','Canal indisponível na configuração atual.'); continue;
+          await this.repository.setDelivery(delivery.delivery_id, 'disabled', 'Canal indisponível na configuração atual.');
+          continue;
         }
-        this.repository.setDelivery(delivery.delivery_id,'sending');
-        try { await adapter.send(alertMessage(delivery)); this.repository.setDelivery(delivery.delivery_id,'sent','Aceito pelo provedor.'); }
-        catch { this.repository.setDelivery(delivery.delivery_id,'failed','Falha ou timeout no provedor. Sem reenvio automático para evitar duplicação.'); }
+        await this.repository.setDelivery(delivery.delivery_id, 'sending');
+        try {
+          await adapter.send(alertMessage(delivery));
+          await this.repository.setDelivery(delivery.delivery_id, 'sent', 'Aceito pelo provedor.');
+        } catch {
+          await this.repository.setDelivery(delivery.delivery_id, 'failed', 'Falha ou timeout no provedor. Sem reenvio automático para evitar duplicação.');
+        }
       }
-    } finally { this.running=false; }
+    } finally {
+      this.running = false;
+    }
   }
 }

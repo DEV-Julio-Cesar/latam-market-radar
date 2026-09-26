@@ -184,3 +184,7 @@ Monitoramentos e observações aceitam grade: null (qualquer grau no monitoramen
 ## Discord por conta
 
 Em Notificações, cada usuário pode salvar um webhook HTTPS de discord.com e ativar os próximos alertas da própria conta. O endereço não é retornado pela API. Desativar, trocar ou remover cancela entregas Discord pendentes; mensagens já em envio podem terminar. Não há envio de teste nem repetição automática de alertas antigos. A configuração pessoal é opt-in e independe do destino global por ambiente; quando existe, tem prioridade (inclusive desativada). WhatsApp mantém a configuração global anterior. Os webhooks são credenciais guardadas no banco privado do servidor: proteja o banco e seus backups; nunca os publique. No Render gratuito, uma nova implantação pode apagar também essas configurações.
+
+### Persistência na hospedagem
+
+Use PostgreSQL externo pela variável `DATABASE_URL` para conservar contas e históricos após reinícios e atualizações no Render. SQLite continua disponível localmente. A configuração, os cuidados com dados antigos e o comando de migração estão em [DEPLOY.md](DEPLOY.md). Nunca publique arquivos `.env` ou backups.

@@ -63,5 +63,6 @@ export function openDatabase(filename) {
     if(!db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name==='grade'))db.exec(`ALTER TABLE ${table} ADD COLUMN grade TEXT CHECK(grade IS NULL OR grade IN ('none','D','C','B','A'))`);
   }
   db.exec(`CREATE TABLE IF NOT EXISTS user_discord (user_id INTEGER PRIMARY KEY REFERENCES users(id), webhook TEXT, enabled INTEGER NOT NULL DEFAULT 0); PRAGMA user_version = 4;`);
+  db.exec("CREATE TABLE IF NOT EXISTS browser_connections (\n      user_id INTEGER PRIMARY KEY REFERENCES users(id),token_hash TEXT NOT NULL,\n      expires_at TEXT NOT NULL,last_read TEXT,status TEXT NOT NULL DEFAULT 'Aguardando extensão'\n    ); CREATE TABLE IF NOT EXISTS browser_snapshots (\n      user_id INTEGER NOT NULL, watch_id INTEGER NOT NULL, fingerprint TEXT NOT NULL,\n      observed_at TEXT NOT NULL, PRIMARY KEY(user_id,watch_id)\n    ); CREATE TABLE IF NOT EXISTS browser_read_log (\n      id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL,watch_id INTEGER NOT NULL,\n      item_name TEXT NOT NULL,status TEXT NOT NULL,reader_version TEXT NOT NULL,\n      detail TEXT NOT NULL,received_at TEXT NOT NULL\n    );");
   return db;
 }

@@ -1,8 +1,10 @@
 import path from 'node:path';
 
 export function configFromEnv(env = process.env) {
+  if (env.RENDER && !env.DATABASE_URL) throw new Error('Configure DATABASE_URL para persistir as contas no Render.');
   return {
     host: env.HOST || '127.0.0.1', port: Number(env.PORT || 3001),
+    databaseUrl: env.DATABASE_URL || '',
     databasePath: path.resolve(env.DATABASE_PATH || './data/radar.sqlite'),
     origin: env.APP_ORIGIN || env.RENDER_EXTERNAL_URL || 'http://127.0.0.1:3001',
     cookieSecure: env.COOKIE_SECURE === 'true', sessionHours: Number(env.SESSION_HOURS || 24),
