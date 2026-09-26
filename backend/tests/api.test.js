@@ -150,3 +150,22 @@ test('adaptadores constroem payloads corretos sem rede real',async()=>{
   assert.equal(calls[1].options.headers.Authorization,'Bearer secret');
   await assert.rejects(()=>new DiscordAdapter({...config,discordWebhook:'http://localhost/private'},transport).send('x'));
 });
+
+test('Discord pessoal isola destinos, oculta credenciais e cancela pendências ao remover',async t=>{
+ const {request,repo,notifications}=await setup(t);
+ const a=await request('/api/auth/register',{method:'POST',body:credentials});
+ const b=await request('/api/auth/register',{method:'POST',body:{...credentials,email:'friend@example.com'}});
+ const destinationA='https://discord.com/api/webhooks/111/test_A',destinationB='https://discord.com/api/webhooks/222/test_B';
+ assert.equal((await request('/api/settings/discord',{method:'POST',cookie:a.cookie,body:{webhook:'https://example.com/api/webhooks/1/x',enabled:true}})).status,422);
+ for(const [cookie,webhook] of [[a.cookie,destinationA],[b.cookie,destinationB]])assert.equal((await request('/api/settings/discord',{method:'POST',cookie,body:{webhook,enabled:true}})).status,200);
+ const settings=await request('/api/settings',{cookie:a.cookie});assert.equal(settings.data.discord.enabled,true);assert.equal(JSON.stringify(settings.data).includes('test_A'),false);assert.equal(JSON.stringify(settings.data).includes('test_B'),false);
+ const calls=[];notifications.discordTransport=async url=>{calls.push(String(url));return{ok:true};};
+ const wa=repo.createWatch(a.data.id,watch),wb=repo.createWatch(b.data.id,watch);
+ const oa=repo.createObservation(a.data.id,observation(),'manual'),ob=repo.createObservation(b.data.id,observation(),'manual');
+ notifications.enqueue(repo.createAlert(a.data.id,wa,oa),a.data);notifications.enqueue(repo.createAlert(b.data.id,wb,ob),b.data);
+ await notifications.drain();assert.deepEqual(calls,[destinationA,destinationB]);
+ const oa2=repo.createObservation(a.data.id,observation(),'manual');notifications.enqueue(repo.createAlert(a.data.id,wa,oa2),a.data);
+ await request('/api/settings/discord',{method:'POST',cookie:a.cookie,body:{remove:true,enabled:false}});
+ await notifications.drain();assert.equal(calls.length,2);assert.equal(repo.discord(a.data.id).webhook,null);assert.equal(repo.discord(b.data.id).webhook,destinationB);
+ assert.equal((await request('/api/settings/discord',{method:'POST',body:{enabled:false}})).status,401);
+});

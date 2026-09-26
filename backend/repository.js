@@ -6,6 +6,13 @@ export class SqliteRepository {
     try { const result = fn(); this.db.exec('COMMIT'); return result; }
     catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
+  discord(userId) {return this.db.prepare('SELECT webhook,enabled FROM user_discord WHERE user_id=?').get(userId);}
+  saveDiscord(userId,webhook,enabled) {
+    return this.transaction(()=>{
+      this.db.prepare("UPDATE deliveries SET status='disabled',detail='Configuração Discord alterada.' WHERE channel='discord' AND status='pending' AND alert_id IN (SELECT id FROM alerts WHERE user_id=?)").run(userId);
+      this.db.prepare('INSERT INTO user_discord VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET webhook=excluded.webhook,enabled=excluded.enabled').run(userId,webhook,Number(enabled));
+    });
+  }
   createUser(email, hash) {
     const result = this.db.prepare('INSERT INTO users(email,password_hash,created_at) VALUES(?,?,?)').run(email, hash, new Date().toISOString());
     return this.userById(Number(result.lastInsertRowid));

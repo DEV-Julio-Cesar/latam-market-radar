@@ -180,3 +180,7 @@ Consulte [extension/README.md](extension/README.md) e a tela **Conexão**. A ext
 ## Filtro de grau
 
 Monitoramentos e observações aceitam grade: null (qualquer grau no monitoramento; desconhecido na observação), none (sem grau), D, C, B ou A. O filtro é independente de refino e respeitado por histórico, estatísticas e alertas. Dados antigos permanecem com grau desconhecido. A extensão atual não identifica grau: monitoramentos com grau específico ficam fora da fila automática até validação do leitor com uma oferta real.
+
+## Discord por conta
+
+Em Notificações, cada usuário pode salvar um webhook HTTPS de discord.com e ativar os próximos alertas da própria conta. O endereço não é retornado pela API. Desativar, trocar ou remover cancela entregas Discord pendentes; mensagens já em envio podem terminar. Não há envio de teste nem repetição automática de alertas antigos. A configuração pessoal é opt-in e independe do destino global por ambiente; quando existe, tem prioridade (inclusive desativada). WhatsApp mantém a configuração global anterior. Os webhooks são credenciais guardadas no banco privado do servidor: proteja o banco e seus backups; nunca os publique. No Render gratuito, uma nova implantação pode apagar também essas configurações.

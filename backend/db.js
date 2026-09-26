@@ -62,6 +62,6 @@ export function openDatabase(filename) {
   for(const table of ['watches','observations']) {
     if(!db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name==='grade'))db.exec(`ALTER TABLE ${table} ADD COLUMN grade TEXT CHECK(grade IS NULL OR grade IN ('none','D','C','B','A'))`);
   }
-  db.exec('PRAGMA user_version = 3');
+  db.exec(`CREATE TABLE IF NOT EXISTS user_discord (user_id INTEGER PRIMARY KEY REFERENCES users(id), webhook TEXT, enabled INTEGER NOT NULL DEFAULT 0); PRAGMA user_version = 4;`);
   return db;
 }

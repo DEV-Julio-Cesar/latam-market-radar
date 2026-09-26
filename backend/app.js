@@ -4,7 +4,7 @@ import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AppError, credentials, validateWatch } from './domain.js';
 import { hashPassword, verifyPassword, hashToken, newToken, readToken, sessionCookie } from './security.js';
-import { NotificationService } from './notifications.js';
+import { NotificationService, validDiscordWebhook } from './notifications.js';
 import { MarketService } from './service.js';
 import { BrowserCollector } from './browser-collector.js';
 
@@ -106,7 +106,16 @@ export function createApp(repo,config,adapters) {
           void notifications.drain().catch(()=>console.error('Falha ao processar fila de notificações.')); return;
         }
         if(path==='/api/alerts' && req.method==='GET') return json(res,200,repo.alerts(user.id));
-        if(path==='/api/settings' && req.method==='GET') return json(res,200,{source:'manual',notificationsEnabled:config.notificationsEnabled,channels:notifications.adapters.map(a=>({name:a.channel,enabled:config.notificationsEnabled && config.notificationOwner===user.email && a.configured()}))});
+        if(path==='/api/settings/discord' && req.method==='POST') {
+          const input=await body(req),old=repo.discord(user.id);
+          if(typeof input.enabled!=='boolean')throw new AppError(422,'Informe se o Discord está ativado.');
+          const webhook=input.remove===true?null:input.webhook===undefined?old?.webhook??null:input.webhook;
+          if(webhook!==null&&!validDiscordWebhook(webhook))throw new AppError(422,'Use um webhook HTTPS válido de discord.com, sem parâmetros.');
+          if(input.enabled&&!webhook)throw new AppError(422,'Cadastre o webhook antes de ativar.');
+          repo.saveDiscord(user.id,webhook,input.enabled);
+          return json(res,200,notifications.discordStatus(user));
+        }
+        if(path==='/api/settings' && req.method==='GET') return json(res,200,{source:'manual',notificationsEnabled:config.notificationsEnabled,discord:notifications.discordStatus(user),channels:notifications.adapters.map(a=>({name:a.channel,enabled:Boolean(notifications.adapterFor(a.channel,user))}))});
         throw new AppError(404,'Recurso não encontrado.');
       }
       if(req.method!=='GET' && req.method!=='HEAD') throw new AppError(405,'Método não permitido.');

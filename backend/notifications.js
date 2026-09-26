@@ -1,3 +1,7 @@
+export function validDiscordWebhook(value) {
+  if(typeof value!=='string'||value.length>512)return false;
+  try {const u=new URL(value);return u.protocol==='https:'&&u.hostname==='discord.com'&&!u.port&&!u.username&&!u.password&&!u.search&&!u.hash&&/^\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/.test(u.pathname);}catch{return false;}
+}
 // These are the only outbound HTTP adapters. Nothing contacts GNJOY or the game.
 export class DiscordAdapter {
   channel = 'discord';
@@ -5,7 +9,7 @@ export class DiscordAdapter {
   configured() { return Boolean(this.config.discordWebhook); }
   async send(message) {
     const url = new URL(this.config.discordWebhook);
-    if (url.protocol !== 'https:' || url.hostname !== 'discord.com' || !/^\/api\/webhooks\/\d+\//.test(url.pathname)) throw new Error('Webhook Discord inválido.');
+    if (!validDiscordWebhook(this.config.discordWebhook)) throw new Error('Webhook Discord inválido.');
     const response = await this.transport(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:message,allowed_mentions:{parse:[]}}),signal:AbortSignal.timeout(10000),redirect:'error'});
     if (!response.ok) throw new Error(`Discord respondeu HTTP ${response.status}.`);
   }
@@ -26,7 +30,7 @@ export class WhatsAppAdapter {
   }
 }
 export function alertMessage(a) {
-  return `Latam Market Radar | ${a.alert_type === 'compra' ? 'Compra' : 'Venda'}: ${a.name} • ${a.server} • ${a.price.toLocaleString('pt-BR')} z • alvo ${a.target_price.toLocaleString('pt-BR')} z. Observação manual; confirme a disponibilidade.`;
+  return `Latam Market Radar | ${a.alert_type === 'compra' ? 'Compra' : 'Venda'}: ${a.name} • ${a.server} • ${a.price.toLocaleString('pt-BR')} z • alvo ${a.target_price.toLocaleString('pt-BR')} z. Preço observado; confirme a disponibilidade.`;
 }
 export class NotificationService {
   constructor(repository,config,adapters) {
@@ -34,9 +38,22 @@ export class NotificationService {
     this.adapters=adapters || [new DiscordAdapter(config),new WhatsAppAdapter(config)];
     this.running=false;
   }
+  adapterFor(channel,user) {
+    if(!user)return null;
+    if(channel==='discord') {
+      const personal=this.repository.discord(user.id);
+      if(personal)return personal.enabled&&personal.webhook?new DiscordAdapter({discordWebhook:personal.webhook},this.discordTransport||fetch):null;
+    }
+    const adapter=this.adapters.find(a=>a.channel===channel);
+    return this.config.notificationsEnabled&&this.config.notificationOwner===user.email&&adapter?.configured()?adapter:null;
+  }
+  discordStatus(user) {
+    const personal=this.repository.discord(user.id);
+    return {configured:Boolean(personal?.webhook),enabled:Boolean(this.adapterFor('discord',user)),source:personal?'personal':'server'};
+  }
   enqueue(alert,user) {
     for (const adapter of this.adapters) {
-      const enabled=this.config.notificationsEnabled && this.config.notificationOwner === user.email && adapter.configured();
+      const enabled=Boolean(this.adapterFor(adapter.channel,user));
       this.repository.createDelivery(alert.id,adapter.channel,enabled ? 'pending':'disabled',enabled ? '' : 'Canal desativado, não configurado ou conta sem destino.');
     }
   }
@@ -45,9 +62,9 @@ export class NotificationService {
     this.running=true;
     try {
       for (const delivery of this.repository.pendingDeliveries()) {
-        const adapter=this.adapters.find(a=>a.channel===delivery.channel);
         const owner=this.repository.userById(delivery.user_id);
-        if (!this.config.notificationsEnabled || owner?.email !== this.config.notificationOwner || !adapter?.configured()) {
+        const adapter=this.adapterFor(delivery.channel,owner);
+        if (!adapter) {
           this.repository.setDelivery(delivery.delivery_id,'disabled','Canal indisponível na configuração atual.'); continue;
         }
         this.repository.setDelivery(delivery.delivery_id,'sending');
