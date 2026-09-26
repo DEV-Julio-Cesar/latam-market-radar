@@ -1,0 +1,12 @@
+{
+  "manifest_version":3,
+  "name":"Latam Market Radar — leitura no navegador",
+  "version":"1.2.0",
+  "minimum_chrome_version":"120",
+  "description":"Lê somente ofertas visíveis da página pública, com intervalo de 5 minutos e pausa em bloqueios.",
+  "permissions":["storage","alarms"],
+  "host_permissions":["http://127.0.0.1:3001/*","https://ro.gnjoyamericas.com/*"],
+  "background":{"service_worker":"background.js","type":"module"},
+  "action":{"default_popup":"popup.html"},
+  "content_scripts":[{"matches":["https://ro.gnjoyamericas.com/*"],"js":["parser.js","reader.js"],"run_at":"document_idle"}]
+}
